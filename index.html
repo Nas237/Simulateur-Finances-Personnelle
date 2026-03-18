@@ -334,6 +334,19 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:va
   <div class="section" id="tab-tracker"></div>
   <div class="section" id="tab-debts"></div>
   <div class="section" id="tab-projection"></div>
+
+  <!-- WATERMARK FOOTER -->
+  <div id="app-footer" style="text-align:center;padding:20px 24px 32px;border-top:1px solid var(--border);margin-top:8px">
+    <a href="https://wa.me/237656678249" target="_blank" rel="noopener"
+       style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--muted);font-size:12px;transition:color .2s"
+       onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--muted)'">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+      </svg>
+      Créé par <strong style="color:var(--text)">Nasser Mouchili</strong> · Contactez-moi
+    </a>
+    <p style="font-size:10px;color:var(--muted);margin-top:6px;opacity:.6">© 2025 Nasser Mouchili — Tous droits réservés</p>
+  </div>
 </div>
 
 <!-- MODAL DETTE -->
@@ -349,6 +362,10 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:va
       <div class="field"><label id="dm-lbl-rate"></label><input type="number" id="dm-rate" step="0.01" min="0"></div>
       <div class="field"><label id="dm-lbl-monthly"></label><input type="number" id="dm-monthly" min="0"></div>
       <div class="field"><label id="dm-lbl-date"></label><input type="month" id="dm-date"></div>
+      <div class="field" style="display:flex;align-items:center;gap:10px;background:var(--surface2);padding:10px;border-radius:var(--radius-sm)">
+        <input type="checkbox" id="dm-in-budget" style="accent-color:var(--accent);width:15px;height:15px;flex-shrink:0;cursor:pointer">
+        <label id="dm-lbl-in-budget" for="dm-in-budget" style="font-size:13px;color:var(--muted);cursor:pointer;line-height:1.4"></label>
+      </div>
     </div>
     <div id="dm-owed-fields" style="display:none">
       <div class="field"><label id="dm-lbl-debtor"></label><input type="text" id="dm-debtor"></div>
@@ -527,6 +544,7 @@ const T = {
     new_goal:'Nouvel objectif',edit_goal:'Modifier l\'objectif',amort:'Tableau d\'amortissement',
     f_name:'Nom',f_type:'Type',f_init_cap:'Capital initial',f_rem_cap:'Capital restant',
     f_rate:'Taux annuel (%)',f_monthly:'Mensualité',f_start_date:'Date de début',
+    f_in_budget:'Mensualité déjà incluse dans mon budget',
     f_debtor:'Qui vous doit ?',f_owed_amt:'Montant dû',f_due_date:'Remboursement prévu',
     f_goal_name:'Nom de l\'objectif',f_target:'Montant cible',f_already:'Déjà épargné',f_monthly_contrib:'Contribution mensuelle',
     lbl_currency:'Monnaie',lbl_lang:'Langue',lbl_theme:'Thème',
@@ -594,6 +612,7 @@ const T = {
     new_goal:'New goal',edit_goal:'Edit goal',amort:'Amortization schedule',
     f_name:'Name',f_type:'Type',f_init_cap:'Initial capital',f_rem_cap:'Remaining capital',
     f_rate:'Annual rate (%)',f_monthly:'Monthly payment',f_start_date:'Start date',
+    f_in_budget:'Monthly payment already included in my budget',
     f_debtor:'Who owes you?',f_owed_amt:'Amount owed',f_due_date:'Expected repayment',
     f_goal_name:'Goal name',f_target:'Target amount',f_already:'Already saved',f_monthly_contrib:'Monthly contribution',
     lbl_currency:'Currency',lbl_lang:'Language',lbl_theme:'Theme',
@@ -683,9 +702,9 @@ const CAT_COLORS=['#5b8cf7','#3ecf8e','#f5a623','#ef5959','#a78bfa','#38bdf8','#
 let autoSavingsPct = 20; // % des revenus épargnés automatiquement
 let goals=[{id:1,name:"Fonds d'urgence",target:10000,saved:6200,monthly:200},{id:2,name:"Voyage Japon",target:3500,saved:1800,monthly:150},{id:3,name:"Apport immobilier",target:40000,saved:14500,monthly:300}];
 let debts=[
-  {id:1,kind:'credit',name:'Crédit immobilier',capital:180000,remaining:142000,rate:1.85,monthly:820,date:'2020-04'},
-  {id:2,kind:'credit',name:'Crédit auto',capital:12000,remaining:7200,rate:4.2,monthly:230,date:'2022-09'},
-  {id:3,kind:'pret',name:'Prêt famille',capital:5000,remaining:3000,rate:0,monthly:200,date:'2023-01'},
+  {id:1,kind:'credit',name:'Crédit immobilier',capital:180000,remaining:142000,rate:1.85,monthly:820,date:'2020-04',inBudget:true},
+  {id:2,kind:'credit',name:'Crédit auto',capital:12000,remaining:7200,rate:4.2,monthly:230,date:'2022-09',inBudget:true},
+  {id:3,kind:'pret',name:'Prêt famille',capital:5000,remaining:3000,rate:0,monthly:200,date:'2023-01',inBudget:false},
 ];
 let oweds=[{id:10,name:'Marc D.',amount:450,date:'2026-06'},{id:11,name:'Sophie L.',amount:120,date:'2026-04'}];
 let trackerEntries=[];
@@ -708,8 +727,9 @@ const totalIncome=()=>incomes.reduce((s,i)=>s+i.val,0);
 const totalExpenses=()=>expenses.reduce((s,e)=>s+e.val,0);
 const savings=()=>totalIncome()-totalExpenses(); // surplus brut
 const totalGoalContribs=()=>goals.reduce((s,g)=>s+(g.monthly||0),0); // épargne nette réelle
-const autoSavingsAmt=()=>Math.round(totalIncome()*autoSavingsPct/100); // montant épargne auto
-const freeCash=()=>totalIncome()-totalExpenses()-autoSavingsAmt(); // argent libre
+const autoSavingsAmt=()=>Math.round(totalIncome()*autoSavingsPct/100);
+const monthlyDebtNotInBudget=()=>debts.reduce((s,d)=>s+(d.inBudget?0:d.monthly),0); // mensualités non incluses dans le budget
+const freeCash=()=>totalIncome()-totalExpenses()-autoSavingsAmt()-monthlyDebtNotInBudget(); // argent libre réel
 const calcTotalDue=()=>debts.reduce((s,d)=>s+d.remaining,0);
 const calcMonthlyDebt=()=>debts.reduce((s,d)=>s+d.monthly,0);
 const calcTotalOwed=()=>oweds.reduce((s,o)=>s+o.amount,0);
@@ -956,7 +976,7 @@ function renderDashboard(){
       <div class="card"><div class="card-label">${t('lbl_exp')}</div><div class="card-val red">${fmtCur(exp)}</div></div>
       <div class="card"><div class="card-label">${t('lbl_surplus')}</div><div class="card-val ${surplusBrut>=0?'accent':'red'}">${fmtCur(surplusBrut)}</div><div class="card-sub">${currentLang==='fr'?'Revenus − Dépenses':'Income − Expenses'}</div></div>
       <div class="card"><div class="card-label">${t('lbl_sav')}</div><div class="card-val ${contribExceedsSurplus?'red':contribExceedsAuto?'amber':'green'}">${fmtCur(epargneNette)}</div><div class="card-sub">${currentLang==='fr'?'Somme des contributions':'Sum of contributions'}</div></div>
-      <div class="card"><div class="card-label">${t('lbl_free')}</div><div class="card-val ${argentLibre>=0?'green':'red'}">${fmtCur(argentLibre)}</div><div class="card-sub">${currentLang==='fr'?'Après épargne auto':'After auto savings'}</div></div>
+      <div class="card"><div class="card-label">${t('lbl_free')}</div><div class="card-val ${argentLibre>=0?'green':'red'}">${fmtCur(argentLibre)}</div><div class="card-sub">${currentLang==='fr'?'Après épargne':'After savings'}${monthlyDebtNotInBudget()>0?' + dettes':''}</div></div>
       <div class="card"><div class="card-label">${t('lbl_real')}</div><div class="card-val red">${fmtCur(trackerCurrentMonthTotal())}</div><div class="card-sub">${t('months')[new Date().getMonth()]}</div></div>
     </div>
     <div class="grid2">
@@ -1299,7 +1319,37 @@ function renderDebts(){
     <div class="debt-section active" id="debt-loans"><button class="btn-add" onclick="openDebtModal('loan')">${t('btn_add_debt')}</button><div id="loans-list"></div></div>
     <div class="debt-section" id="debt-owed"><button class="btn-add" onclick="openDebtModal('owed')">${t('btn_add_claim')}</button><div id="owed-list"></div></div>`;
   const km={credit:t('kind_credit'),pret:t('kind_pret'),autre:t('kind_autre')};
-  document.getElementById('loans-list').innerHTML=debts.length?debts.map(d=>{const pct=debtProgress(d);const mo=monthsLeft(d);const yrs=Math.floor(mo/12),mos=mo%12;const dur=mo>0?(yrs>0?yrs+'a ':'')+mos+'m':t('repaid');const col=d.kind==='credit'?'var(--red)':'var(--purple)';return `<div class="debt-card"><div class="debt-card-head"><div><div class="debt-name">${d.name}</div><div style="font-size:11px;color:var(--muted);margin-top:3px">${t('since')} ${d.date||'—'} · ${d.rate}% ${t('per_yr')}</div></div><span class="debt-badge ${d.kind==='credit'?'badge-loan':'badge-credit'}">${km[d.kind]||d.kind}</span></div><div class="debt-grid"><div class="debt-stat"><div class="debt-stat-label">${t('lbl_remaining')}</div><div class="debt-stat-val" style="color:var(--red)">${fmtCur(d.remaining)}</div></div><div class="debt-stat"><div class="debt-stat-label">${t('lbl_monthly_d')}</div><div class="debt-stat-val" style="color:var(--amber)">${fmtCur(d.monthly)}</div></div><div class="debt-stat"><div class="debt-stat-label">${t('lbl_time_left')}</div><div class="debt-stat-val">${dur}</div></div></div><div class="prog-row" style="margin-bottom:11px"><div class="prog-head"><span>${t('pct_repaid')}</span><span>${pct}% ${t('pct_repaid')}</span></div><div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${col}"></div></div></div><div class="debt-actions"><button class="btn-small primary" onclick="showAmort(${d.id})">${t('btn_amort')}</button><button class="btn-small" onclick="openDebtModal('loan',${d.id})">${t('btn_edit')}</button><button id="del-debt-${d.id}" class="btn-small danger" onclick="deleteDebt(${d.id})">${t('btn_delete')}</button></div></div>`;}).join(''):`<div class="empty-state"><div>📋</div>${t('no_debt')}</div>`;
+  document.getElementById('loans-list').innerHTML=debts.length?debts.map(d=>{
+    const pct=debtProgress(d);const mo=monthsLeft(d);const yrs=Math.floor(mo/12),mos=mo%12;
+    const dur=mo>0?(yrs>0?yrs+'a ':'')+mos+'m':t('repaid');
+    const col=d.kind==='credit'?'var(--red)':'var(--purple)';
+    const inBudgeBadge=d.inBudget
+      ?`<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(62,207,142,.12);color:var(--green);margin-left:6px">${currentLang==='fr'?'✓ Dans le budget':'✓ In budget'}</span>`
+      :`<span style="font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(245,166,35,.12);color:var(--amber);margin-left:6px">${currentLang==='fr'?'⚡ Déduit de l\'argent libre':'⚡ Deducted from free cash'}</span>`;
+    return `<div class="debt-card">
+      <div class="debt-card-head">
+        <div>
+          <div class="debt-name" style="display:flex;align-items:center;flex-wrap:wrap;gap:4px">${d.name}${inBudgeBadge}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">${t('since')} ${d.date||'—'} · ${d.rate}% ${t('per_yr')}</div>
+        </div>
+        <span class="debt-badge ${d.kind==='credit'?'badge-loan':'badge-credit'}">${km[d.kind]||d.kind}</span>
+      </div>
+      <div class="debt-grid">
+        <div class="debt-stat"><div class="debt-stat-label">${t('lbl_remaining')}</div><div class="debt-stat-val" style="color:var(--red)">${fmtCur(d.remaining)}</div></div>
+        <div class="debt-stat"><div class="debt-stat-label">${t('lbl_monthly_d')}</div><div class="debt-stat-val" style="color:var(--amber)">${fmtCur(d.monthly)}</div></div>
+        <div class="debt-stat"><div class="debt-stat-label">${t('lbl_time_left')}</div><div class="debt-stat-val">${dur}</div></div>
+      </div>
+      <div class="prog-row" style="margin-bottom:11px">
+        <div class="prog-head"><span>${t('pct_repaid')}</span><span>${pct}% ${t('pct_repaid')}</span></div>
+        <div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${col}"></div></div>
+      </div>
+      <div class="debt-actions">
+        <button class="btn-small primary" onclick="showAmort(${d.id})">${t('btn_amort')}</button>
+        <button class="btn-small" onclick="openDebtModal('loan',${d.id})">${t('btn_edit')}</button>
+        <button id="del-debt-${d.id}" class="btn-small danger" onclick="deleteDebt(${d.id})">${t('btn_delete')}</button>
+      </div>
+    </div>`;
+  }).join(''):`<div class="empty-state"><div>📋</div>${t('no_debt')}</div>`;
   document.getElementById('owed-list').innerHTML=oweds.length?oweds.map(o=>`<div class="debt-card"><div class="debt-card-head"><div><div class="debt-name">${o.name}</div><div style="font-size:11px;color:var(--muted);margin-top:3px">${o.date||'—'}</div></div><span class="debt-badge badge-owed">${t('badge_claim')}</span></div><div class="debt-grid" style="grid-template-columns:1fr 1fr"><div class="debt-stat"><div class="debt-stat-label">${t('f_owed_amt')}</div><div class="debt-stat-val" style="color:var(--green)">${fmtCur(o.amount)}</div></div><div class="debt-stat"><div class="debt-stat-label">${t('f_due_date')}</div><div class="debt-stat-val">${o.date||'—'}</div></div></div><div class="debt-actions"><button class="btn-small primary" onclick="openDebtModal('owed',${o.id})">${t('btn_edit')}</button><button id="paid-owed-${o.id}" class="btn-small danger" onclick="markPaid(${o.id})">${t('mark_paid')}</button></div></div>`).join(''):`<div class="empty-state"><div>🤝</div>${t('no_claim')}</div>`;
 }
 function showDebtTab(id,btn){document.querySelectorAll('.debt-section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tab-debt-btn').forEach(b=>b.classList.remove('active'));document.getElementById('debt-'+id).classList.add('active');btn.classList.add('active');}
@@ -1316,16 +1366,22 @@ function openDebtModal(type,editId=null){
   document.getElementById('dm-lbl-rate').textContent=t('f_rate');document.getElementById('dm-lbl-monthly').textContent=t('f_monthly');
   document.getElementById('dm-lbl-date').textContent=t('f_start_date');document.getElementById('dm-lbl-debtor').textContent=t('f_debtor');
   document.getElementById('dm-lbl-owed-amt').textContent=t('f_owed_amt');document.getElementById('dm-lbl-owed-date').textContent=t('f_due_date');
-  if(editId){if(isOwed){const o=oweds.find(x=>x.id===editId);if(o){document.getElementById('dm-debtor').value=o.name;document.getElementById('dm-owed-amt').value=o.amount;document.getElementById('dm-owed-date').value=o.date||'';}}else{const d=debts.find(x=>x.id===editId);if(d){document.getElementById('dm-name').value=d.name;document.getElementById('dm-kind').value=d.kind;document.getElementById('dm-capital').value=d.capital;document.getElementById('dm-remaining').value=d.remaining;document.getElementById('dm-rate').value=d.rate;document.getElementById('dm-monthly').value=d.monthly;document.getElementById('dm-date').value=d.date||'';}}}
-  else['dm-name','dm-capital','dm-remaining','dm-rate','dm-monthly','dm-date','dm-debtor','dm-owed-amt','dm-owed-date'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  document.getElementById('dm-lbl-in-budget').textContent=t('f_in_budget');
+  if(editId){
+    if(isOwed){const o=oweds.find(x=>x.id===editId);if(o){document.getElementById('dm-debtor').value=o.name;document.getElementById('dm-owed-amt').value=o.amount;document.getElementById('dm-owed-date').value=o.date||'';}}
+    else{const d=debts.find(x=>x.id===editId);if(d){document.getElementById('dm-name').value=d.name;document.getElementById('dm-kind').value=d.kind;document.getElementById('dm-capital').value=d.capital;document.getElementById('dm-remaining').value=d.remaining;document.getElementById('dm-rate').value=d.rate;document.getElementById('dm-monthly').value=d.monthly;document.getElementById('dm-date').value=d.date||'';document.getElementById('dm-in-budget').checked=d.inBudget||false;}}
+  } else {
+    ['dm-name','dm-capital','dm-remaining','dm-rate','dm-monthly','dm-date','dm-debtor','dm-owed-amt','dm-owed-date'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+    document.getElementById('dm-in-budget').checked=false;
+  }
   document.getElementById('debt-modal-overlay').classList.add('open');
 }
 function closeDebtModal(){document.getElementById('debt-modal-overlay').classList.remove('open');}
 function saveDebt(){
   const type=document.getElementById('dm-type').value,eid=document.getElementById('dm-edit-id').value,isOwed=type==='owed';
   if(isOwed){const obj={id:eid?+eid:nextId++,name:document.getElementById('dm-debtor').value||'?',amount:+document.getElementById('dm-owed-amt').value||0,date:document.getElementById('dm-owed-date').value};if(eid){const i=oweds.findIndex(x=>x.id===+eid);if(i>=0)oweds[i]=obj;}else oweds.push(obj);}
-  else{const obj={id:eid?+eid:nextId++,kind:document.getElementById('dm-kind').value,name:document.getElementById('dm-name').value||'?',capital:+document.getElementById('dm-capital').value||0,remaining:+document.getElementById('dm-remaining').value||0,rate:+document.getElementById('dm-rate').value||0,monthly:+document.getElementById('dm-monthly').value||0,date:document.getElementById('dm-date').value};if(eid){const i=debts.findIndex(x=>x.id===+eid);if(i>=0)debts[i]=obj;}else debts.push(obj);}
-  closeDebtModal();renderDebts();saveAll();
+  else{const obj={id:eid?+eid:nextId++,kind:document.getElementById('dm-kind').value,name:document.getElementById('dm-name').value||'?',capital:+document.getElementById('dm-capital').value||0,remaining:+document.getElementById('dm-remaining').value||0,rate:+document.getElementById('dm-rate').value||0,monthly:+document.getElementById('dm-monthly').value||0,date:document.getElementById('dm-date').value,inBudget:document.getElementById('dm-in-budget').checked};if(eid){const i=debts.findIndex(x=>x.id===+eid);if(i>=0)debts[i]=obj;}else debts.push(obj);}
+  closeDebtModal();renderDebts();renderDashboard();saveAll();
 }
 function deleteDebt(id){
   const btn=document.getElementById('del-debt-'+id);
@@ -1518,7 +1574,7 @@ function applyPayload(d) {
   if (d.incomes)        incomes        = d.incomes;
   if (d.expenses)       expenses       = d.expenses;
   if (d.goals)          goals          = d.goals.map(g => ({ monthly: 0, ...g })); // migration : ajoute monthly si absent
-  if (d.debts)          debts          = d.debts;
+  if (d.debts)          debts          = d.debts.map(d => ({ inBudget: false, ...d }));
   if (d.oweds)          oweds          = d.oweds;
   if (d.trackerEntries) trackerEntries = d.trackerEntries;
   if (d.nextId)         nextId         = d.nextId;
@@ -1878,9 +1934,56 @@ function generatePDF() {
   });
   divider();
 
-  // ═══ SECTION 5 — DETTES (nouvelle page si nécessaire)
+  // ═══ SECTION 5 — DÉPENSES QUOTIDIENNES
+  if (y > 200) { doc.addPage(); y = 20; }
+  sectionTitle(fr ? '5. Dépenses Quotidiennes du Mois' : '5. Monthly Daily Expenses');
+  const nowEntries = trackerMonthEntries();
+  const nowTotal = nowEntries.reduce((s,e) => s + e.amount, 0);
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const avgDay = now.getDate() > 0 ? nowTotal / now.getDate() : 0;
+
+  if (nowEntries.length === 0) {
+    doc.setFont('helvetica','italic'); doc.setFontSize(9); setTextColor(GRAY);
+    doc.text(fr ? 'Aucune dépense enregistrée ce mois.' : 'No expenses recorded this month.', 12, y); y += 10;
+  } else {
+    metricRow([
+      { label: fr ? 'Total du mois' : 'Month total', value: fmtCur(nowTotal), color: RED },
+      { label: fr ? 'Nb. transactions' : 'Transactions', value: String(nowEntries.length), color: ACCENT },
+      { label: fr ? 'Moyenne / jour' : 'Daily avg.', value: fmtCur(avgDay), color: AMBER },
+    ]);
+    // Répartition par catégorie
+    const catTotals = {};
+    nowEntries.forEach(e => { catTotals[e.category] = (catTotals[e.category]||0) + e.amount; });
+    const sortedCats = Object.entries(catTotals).sort((a,b) => b[1]-a[1]);
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setTextColor(GRAY);
+    doc.text(fr ? 'Répartition par catégorie :' : 'By category:', 12, y); y += 6;
+    sortedCats.forEach(([cat, amt]) => {
+      const col = getCatColor(cat);
+      const hexToRgb = h => { const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h); return r ? [parseInt(r[1],16),parseInt(r[2],16),parseInt(r[3],16)] : ACCENT; };
+      progressBar(cat, amt, nowTotal, hexToRgb(col), `${fmtCur(amt)}  (${nowTotal>0?Math.round(amt/nowTotal*100):0}%)`);
+    });
+    // Top 5 dépenses récentes
+    if (y > 220) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); setTextColor(GRAY);
+    doc.text(fr ? '5 dernières dépenses :' : 'Last 5 expenses:', 12, y); y += 6;
+    const recent = [...nowEntries].sort((a,b) => new Date(b.date)-new Date(a.date)).slice(0,5);
+    recent.forEach(e => {
+      const d = new Date(e.date).toLocaleDateString('fr-FR',{day:'numeric',month:'short'});
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+      setTextColor(WHITE);
+      doc.text(`${d}  —  ${e.desc}`, 14, y);
+      setTextColor(RED);
+      doc.text(fmtCur(e.amount), W-12, y, { align: 'right' });
+      setTextColor(GRAY);
+      doc.text(e.category, W-50, y, { align: 'right' });
+      y += 6;
+    });
+  }
+  divider();
+
+  // ═══ SECTION 6 — DETTES (nouvelle page si nécessaire)
   if (y > 220) { doc.addPage(); y = 20; }
-  sectionTitle(fr ? '5. Résumé des Dettes' : '5. Debts Summary');
+  sectionTitle(fr ? '6. Résumé des Dettes' : '6. Debts Summary');
   if (debts.length === 0) {
     doc.setFont('helvetica', 'italic'); doc.setFontSize(9); setTextColor(GRAY);
     doc.text(fr ? 'Aucune dette enregistrée.' : 'No debts recorded.', 12, y); y += 10;
@@ -1942,23 +2045,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-function showFooter() {
-  const f = document.getElementById('app-footer');
-  if (f) f.style.display = 'block';
-}
+function showFooter() { /* footer always visible inside #main-app */ }
 </script>
-
-<!-- WATERMARK -->
-<div id="app-footer" style="display:none;text-align:center;padding:20px 24px 32px;border-top:1px solid var(--border);margin-top:8px">
-  <a href="https://wa.me/237656678249" target="_blank" rel="noopener"
-     style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--muted);font-size:12px;transition:color .2s"
-     onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--muted)'">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-    </svg>
-    Créé par <strong style="color:var(--text)">Nasser Mouchili</strong> · Contactez-moi
-  </a>
-  <p style="font-size:10px;color:var(--muted);margin-top:6px;opacity:.6">© 2025 Nasser Mouchili — Tous droits réservés</p>
-</div>
 </body>
 </html>
