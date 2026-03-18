@@ -320,6 +320,9 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:va
         <option value="en">🇬🇧 EN</option>
       </select>
       <div class="vsep"></div>
+      <button class="mode-mini" onclick="exportData()" title="Exporter mes données" style="font-size:14px;padding:4px 8px">💾</button>
+      <label class="mode-mini" title="Importer des données" style="font-size:14px;padding:4px 8px;cursor:pointer">📂<input type="file" accept=".json" onchange="importData(event)" style="display:none"></label>
+      <div class="vsep"></div>
       <button class="mode-mini" id="reset-btn" onclick="resetApp()" title="Réinitialiser / Reset" style="font-size:14px;padding:4px 8px">🗑️</button>
     </div>
   </div>
@@ -366,6 +369,7 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:va
     <div class="field"><label id="gm-lbl-name"></label><input type="text" id="gm-name"></div>
     <div class="field"><label id="gm-lbl-target"></label><input type="number" id="gm-target" min="0"></div>
     <div class="field"><label id="gm-lbl-saved"></label><input type="number" id="gm-saved" min="0" placeholder="0"></div>
+    <div class="field"><label id="gm-lbl-monthly"></label><input type="number" id="gm-monthly-contrib" min="0" placeholder="0"></div>
     <div class="modal-footer">
       <button class="btn-cancel" id="gm-btn-cancel" onclick="closeGoalModal()"></button>
       <button class="btn-save" id="gm-btn-save" onclick="saveGoal()"></button>
@@ -519,7 +523,7 @@ const T = {
     f_name:'Nom',f_type:'Type',f_init_cap:'Capital initial',f_rem_cap:'Capital restant',
     f_rate:'Taux annuel (%)',f_monthly:'Mensualité',f_start_date:'Date de début',
     f_debtor:'Qui vous doit ?',f_owed_amt:'Montant dû',f_due_date:'Remboursement prévu',
-    f_goal_name:'Nom de l\'objectif',f_target:'Montant cible',f_already:'Déjà épargné',
+    f_goal_name:'Nom de l\'objectif',f_target:'Montant cible',f_already:'Déjà épargné',f_monthly_contrib:'Contribution mensuelle',
     lbl_currency:'Monnaie',lbl_lang:'Langue',lbl_theme:'Thème',
     w_name:'Votre prénom',w_ph:'ex : Karim',w_title:'Mes Finances',
     w_tagline:'Votre simulateur personnel de budget,\nd\'épargne et de projection patrimoniale.',
@@ -583,7 +587,7 @@ const T = {
     f_name:'Name',f_type:'Type',f_init_cap:'Initial capital',f_rem_cap:'Remaining capital',
     f_rate:'Annual rate (%)',f_monthly:'Monthly payment',f_start_date:'Start date',
     f_debtor:'Who owes you?',f_owed_amt:'Amount owed',f_due_date:'Expected repayment',
-    f_goal_name:'Goal name',f_target:'Target amount',f_already:'Already saved',
+    f_goal_name:'Goal name',f_target:'Target amount',f_already:'Already saved',f_monthly_contrib:'Monthly contribution',
     lbl_currency:'Currency',lbl_lang:'Language',lbl_theme:'Theme',
     w_name:'Your first name',w_ph:'e.g. Alex',w_title:'My Finances',
     w_tagline:'Your personal budget simulator,\nsavings tracker and wealth projection tool.',
@@ -668,7 +672,7 @@ let expenses=[
   {id:7,label:'Habillement',val:80,color:'#fb7185'},
 ];
 const CAT_COLORS=['#5b8cf7','#3ecf8e','#f5a623','#ef5959','#a78bfa','#38bdf8','#fb7185','#f472b6','#34d399','#fbbf24'];
-let goals=[{id:1,name:"Fonds d'urgence",target:10000,saved:6200},{id:2,name:'Voyage Japon',target:3500,saved:1800},{id:3,name:'Apport immobilier',target:40000,saved:14500}];
+let goals=[{id:1,name:"Fonds d'urgence",target:10000,saved:6200,monthly:200},{id:2,name:"Voyage Japon",target:3500,saved:1800,monthly:150},{id:3,name:"Apport immobilier",target:40000,saved:14500,monthly:300}];
 let debts=[
   {id:1,kind:'credit',name:'Crédit immobilier',capital:180000,remaining:142000,rate:1.85,monthly:820,date:'2020-04'},
   {id:2,kind:'credit',name:'Crédit auto',capital:12000,remaining:7200,rate:4.2,monthly:230,date:'2022-09'},
@@ -768,23 +772,100 @@ function buildFinancialContext(){
   return {inc,exp,sav,debtTotal,monthlyDebt,trackerTotal,topExpenses,catBreakdown,score,currency:SYMBOLS[currentCurrency],savRate:inc>0?Math.round(sav/inc*100):0,debtRatio:inc>0?Math.round(monthlyDebt/inc*100):0};
 }
 
-async function loadDiagnosis(){
-  const container=document.getElementById('diag-content');
-  if(!container)return;
-  container.innerHTML=`<div class="diag-loading"><div class="diag-spinner"></div><span>${t('diag_loading')}</span></div>`;
+function generateTips(ctx) {
+  const tips = [];
+  const fr = currentLang === 'fr';
 
-  const ctx=buildFinancialContext();
-  const sav=savings();
-  const statusClass=sav>0?'surplus':sav<0?'deficit':'balanced';
-  const statusLabel=sav>0?t('diag_surplus'):sav<0?t('diag_deficit'):t('diag_balanced');
-  const statusEmoji=sav>0?t('diag_emoji_surplus'):sav<0?t('diag_emoji_deficit'):t('diag_emoji_balanced');
-  const score=ctx.score;
-  const scoreColor=score>=70?'#3ecf8e':score>=45?'#f5a623':'#ef5959';
-  const circumference=2*Math.PI*22;
-  const dashOffset=circumference*(1-score/100);
+  // Tip 1 — Savings rate
+  if (ctx.sav < 0) {
+    tips.push({ icon: '🚨', text: fr
+      ? `Votre budget est <strong>déficitaire de ${fmtCur(Math.abs(ctx.sav))}/mois</strong>. Réduisez en priorité votre poste le plus élevé (${ctx.topExpenses[0]?.name||'dépenses'} : ${fmtCur(ctx.topExpenses[0]?.val||0)}) ou augmentez vos revenus.`
+      : `Your budget is <strong>in deficit by ${fmtCur(Math.abs(ctx.sav))}/month</strong>. Prioritize reducing your top expense (${ctx.topExpenses[0]?.name||'expenses'}: ${fmtCur(ctx.topExpenses[0]?.val||0)}) or increasing your income.`
+    });
+  } else if (ctx.savRate < 10) {
+    tips.push({ icon: '⚠️', text: fr
+      ? `Votre taux d'épargne est de <strong>${ctx.savRate}%</strong>, en dessous du minimum recommandé de 10%. Essayez d'économiser ${fmtCur(Math.round(ctx.inc * 0.1 - ctx.sav))} supplémentaires par mois pour atteindre ce seuil.`
+      : `Your savings rate is <strong>${ctx.savRate}%</strong>, below the recommended 10% minimum. Try saving an additional ${fmtCur(Math.round(ctx.inc * 0.1 - ctx.sav))} per month to reach this threshold.`
+    });
+  } else if (ctx.savRate >= 20) {
+    tips.push({ icon: '🌟', text: fr
+      ? `Excellent ! Votre taux d'épargne est de <strong>${ctx.savRate}%</strong>, au-dessus des 20% recommandés. Envisagez de placer l'excédent pour faire travailler cet argent via la projection long terme.`
+      : `Excellent! Your savings rate is <strong>${ctx.savRate}%</strong>, above the recommended 20%. Consider investing the surplus — use the long-term projection tab to simulate your gains.`
+    });
+  } else {
+    tips.push({ icon: '💡', text: fr
+      ? `Votre taux d'épargne est de <strong>${ctx.savRate}%</strong>. Pour atteindre l'objectif idéal de 20%, il vous faudrait épargner ${fmtCur(Math.round(ctx.inc * 0.2 - ctx.sav))} de plus par mois.`
+      : `Your savings rate is <strong>${ctx.savRate}%</strong>. To reach the ideal 20% target, you'd need to save an additional ${fmtCur(Math.round(ctx.inc * 0.2 - ctx.sav))} per month.`
+    });
+  }
 
-  // Status + score block (rendered immediately, no API needed)
-  const statusBlock=`
+  // Tip 2 — Debt ratio
+  if (ctx.debtRatio > 35) {
+    tips.push({ icon: '📉', text: fr
+      ? `Vos mensualités de dettes représentent <strong>${ctx.debtRatio}% de vos revenus</strong>, au-dessus du seuil critique de 35%. Priorisez le remboursement de la dette au taux le plus élevé pour réduire vos intérêts.`
+      : `Your debt payments represent <strong>${ctx.debtRatio}% of your income</strong>, above the critical 35% threshold. Prioritize repaying the highest-interest debt first to reduce total interest paid.`
+    });
+  } else if (ctx.debtTotal > 0) {
+    tips.push({ icon: '✅', text: fr
+      ? `Votre ratio d'endettement est sain à <strong>${ctx.debtRatio}%</strong> de vos revenus. Continuez à honorer vos mensualités et envisagez de rembourser par anticipation si votre épargne le permet.`
+      : `Your debt ratio is healthy at <strong>${ctx.debtRatio}%</strong> of your income. Keep meeting your payments and consider early repayment if your savings allow.`
+    });
+  } else {
+    tips.push({ icon: '🎉', text: fr
+      ? `Vous n'avez <strong>aucune dette enregistrée</strong> — c'est une excellente position. Redirigez l'énergie vers vos objectifs d'épargne et la constitution d'un patrimoine.`
+      : `You have <strong>no recorded debts</strong> — excellent position. Redirect your energy toward savings goals and wealth building.`
+    });
+  }
+
+  // Tip 3 — Tracker vs budget
+  if (ctx.trackerTotal > 0 && ctx.exp > 0) {
+    const diff = ctx.trackerTotal - ctx.exp;
+    if (diff > ctx.exp * 0.1) {
+      tips.push({ icon: '📊', text: fr
+        ? `Vos dépenses réelles ce mois (${fmtCur(ctx.trackerTotal)}) dépassent votre budget prévu (${fmtCur(ctx.exp)}) de <strong>${fmtCur(diff)}</strong>. Votre poste le plus dépensé est <em>${ctx.topExpenses[0]?.name||'—'}</em>.`
+        : `Your actual spending this month (${fmtCur(ctx.trackerTotal)}) exceeds your planned budget (${fmtCur(ctx.exp)}) by <strong>${fmtCur(diff)}</strong>. Your top spending category is <em>${ctx.topExpenses[0]?.name||'—'}</em>.`
+      });
+    } else {
+      tips.push({ icon: '👍', text: fr
+        ? `Vos dépenses réelles (${fmtCur(ctx.trackerTotal)}) sont dans les limites de votre budget prévu (${fmtCur(ctx.exp)}). Maintenez ce rythme jusqu'à la fin du mois.`
+        : `Your actual spending (${fmtCur(ctx.trackerTotal)}) is within your planned budget (${fmtCur(ctx.exp)}). Keep up this pace through the end of the month.`
+      });
+    }
+  } else {
+    tips.push({ icon: '📝', text: fr
+      ? `Commencez à enregistrer vos dépenses quotidiennes dans l'onglet <strong>Dépenses quotidiennes</strong> pour obtenir une analyse précise de vos habitudes de consommation.`
+      : `Start recording your daily spending in the <strong>Daily Expenses</strong> tab to get an accurate analysis of your spending habits.`
+    });
+  }
+
+  // Tip 4 — Promo fixe Nasser Mouchili
+  tips.push({ icon: '🚀', promo: true, text: fr
+    ? `<strong>Et si votre argent travaillait vraiment pour vous ?</strong> Rejoins une communauté de personnes qui construisent leur liberté financière et découvrent leur plein potentiel.`
+    : `<strong>What if your money truly worked for you?</strong> Join a community of people building financial freedom and unlocking their full potential.`,
+    cta: fr ? 'Contactez-moi pour en savoir plus' : 'Contact me to find out more',
+    link: 'https://wa.me/237656678249'
+  });
+
+  return tips;
+}
+
+function loadDiagnosis() {
+  const container = document.getElementById('diag-content');
+  if (!container) return;
+
+  const ctx = buildFinancialContext();
+  const sav = savings();
+  const statusClass = sav > 0 ? 'surplus' : sav < 0 ? 'deficit' : 'balanced';
+  const statusLabel = sav > 0 ? t('diag_surplus') : sav < 0 ? t('diag_deficit') : t('diag_balanced');
+  const statusEmoji = sav > 0 ? t('diag_emoji_surplus') : sav < 0 ? t('diag_emoji_deficit') : t('diag_emoji_balanced');
+  const score = ctx.score;
+  const scoreColor = score >= 70 ? '#3ecf8e' : score >= 45 ? '#f5a623' : '#ef5959';
+  const circumference = 2 * Math.PI * 22;
+  const dashOffset = circumference * (1 - score / 100);
+
+  const tips = generateTips(ctx);
+
+  container.innerHTML = `
     <div class="diag-status ${statusClass}">
       <div class="diag-icon">${statusEmoji}</div>
       <div class="diag-status-text">
@@ -795,62 +876,35 @@ async function loadDiagnosis(){
         <div>
           <div class="diag-score-ring">
             <svg width="56" height="56" viewBox="0 0 56 56">
-              <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="4"/>
+              <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(128,128,128,.2)" stroke-width="4"/>
               <circle cx="28" cy="28" r="22" fill="none" stroke="${scoreColor}" stroke-width="4"
-                stroke-dasharray="${circumference}" stroke-dashoffset="${dashOffset}" stroke-linecap="round"/>
+                stroke-dasharray="${circumference.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}" stroke-linecap="round"/>
             </svg>
             <div class="diag-score-num" style="color:${scoreColor}">${score}</div>
           </div>
           <div class="diag-score-label">${t('diag_score')}</div>
         </div>
       </div>
-    </div>`;
-
-  // Render status immediately
-  container.innerHTML=statusBlock+`<div id="diag-tips-area"><div class="diag-loading"><div class="diag-spinner"></div><span>${t('diag_loading')}</span></div></div>`;
-
-  // Now call Claude API for personalised tips
-  const lang=currentLang==='fr'?'français':'English';
-  const prompt=`Tu es un conseiller financier personnel. Analyse ces données financières et génère exactement 3 conseils concrets, personnalisés et actionnables. Réponds en ${lang}.
-
-DONNÉES FINANCIÈRES:
-- Revenus mensuels: ${ctx.inc} ${ctx.currency}
-- Dépenses budgétées: ${ctx.exp} ${ctx.currency}
-- Épargne nette: ${ctx.sav} ${ctx.currency} (${ctx.savRate}% du revenu)
-- Capital de dettes total: ${ctx.debtTotal} ${ctx.currency}
-- Mensualités de dettes: ${ctx.monthlyDebt} ${ctx.currency} (${ctx.debtRatio}% du revenu)
-- Dépenses réelles ce mois (tracker): ${ctx.trackerTotal} ${ctx.currency}
-- Top dépenses: ${ctx.topExpenses.map(e=>`${e.name}: ${e.val} ${ctx.currency}`).join(', ')}
-- Score de santé financière: ${score}/100
-
-Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte avant ou après:
-{"tips":[{"icon":"emoji","text":"conseil concret en 1-2 phrases avec chiffres précis"},{"icon":"emoji","text":"..."},{"icon":"emoji","text":"..."}]}`;
-
-  try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
-        messages:[{role:'user',content:prompt}]
-      })
-    });
-    const data=await res.json();
-    const raw=data.content?.filter(b=>b.type==='text').map(b=>b.text).join('').trim();
-    const parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());
-    const tipsArea=document.getElementById('diag-tips-area');
-    if(tipsArea){
-      tipsArea.innerHTML=`<div class="diag-tips">${parsed.tips.map(tip=>`
+    </div>
+    <div class="diag-tips">
+      ${tips.map(tip => tip.promo ? `
+        <div class="diag-tip" style="background:linear-gradient(135deg,rgba(91,140,247,.12),rgba(62,207,142,.08));border:1px solid rgba(91,140,247,.25);flex-direction:column;gap:10px">
+          <div style="display:flex;gap:10px;align-items:flex-start">
+            <div class="diag-tip-icon">${tip.icon}</div>
+            <div class="diag-tip-text">${tip.text}</div>
+          </div>
+          <a href="${tip.link}" target="_blank" rel="noopener"
+             style="display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 18px;border-radius:8px;background:var(--accent);color:#fff;font-family:var(--font-body);font-size:13px;font-weight:500;text-decoration:none;transition:opacity .2s;align-self:flex-start"
+             onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            ${tip.cta}
+          </a>
+        </div>` : `
         <div class="diag-tip">
           <div class="diag-tip-icon">${tip.icon}</div>
-          <div class="diag-tip-text">${tip.text.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</div>
-        </div>`).join('')}</div>`;
-    }
-  } catch(e){
-    const tipsArea=document.getElementById('diag-tips-area');
-    if(tipsArea)tipsArea.innerHTML=`<div class="diag-error">${t('diag_error')}</div>`;
-  }
+          <div class="diag-tip-text">${tip.text}</div>
+        </div>`).join('')}
+    </div>`;
 }
 
 // ══════════════════════════════════════════════
@@ -1083,30 +1137,60 @@ function deleteEntry(id){trackerEntries=trackerEntries.filter(e=>e.id!==id);upda
 // SAVINGS
 // ══════════════════════════════════════════════
 function renderSavings(){
-  const sav=savings();
   const el=document.getElementById('tab-savings');
   el.innerHTML=`<div class="sec-head">${t('sec_savings')}</div><div class="sec-sub">${t('sub_savings')}</div><button class="btn-add" onclick="openGoalModal()">${t('btn_new_goal')}</button><div id="goals-list"></div>`;
   const gl=document.getElementById('goals-list');
   if(!goals.length){gl.innerHTML=`<div class="empty-state"><div>🎯</div>${t('no_goal')}</div>`;return;}
-  gl.innerHTML=goals.map(g=>{const pct=Math.min(100,Math.round(g.saved/g.target*100));const left=g.target-g.saved;const mo=sav>0?Math.ceil(left/sav):'∞';return `<div class="goal-item"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-size:14px;font-weight:500">${g.name}</span><div style="display:flex;gap:8px;align-items:center"><span style="font-size:12px;color:var(--accent)">${pct}%</span><button class="btn-small" onclick="openGoalModal(goals.find(x=>x.id===${g.id}))" style="padding:3px 8px;font-size:11px">${t('btn_edit')}</button><button class="btn-small danger" onclick="deleteGoal(${g.id})" style="padding:3px 8px;font-size:11px">✕</button></div></div><div class="prog-track" style="margin-bottom:9px"><div class="prog-fill" style="width:${pct}%;background:var(--accent)"></div></div><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--muted)"><span>${t('lbl_saved')} : <strong style="color:var(--text)">${fmtCur(g.saved)}</strong></span><span>${t('lbl_target')} : <strong style="color:var(--text)">${fmtCur(g.target)}</strong></span><span>${t('lbl_left')} : <strong style="color:var(--amber)">${fmtCur(left)}</strong> · ~${mo} ${t('lbl_months')}</span></div></div>`;}).join('');
+  gl.innerHTML=goals.map(g=>{
+    const pct=Math.min(100,Math.round(g.saved/g.target*100));
+    const left=Math.max(0,g.target-g.saved);
+    const contrib=g.monthly||0;
+    const mo=contrib>0?Math.ceil(left/contrib):'∞';
+    const moLabel=contrib>0?(mo+' '+t('lbl_months')):'— '+( currentLang==='fr'?'(définissez une contribution)':'(set a contribution)');
+    return `<div class="goal-item">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span style="font-size:14px;font-weight:500">${g.name}</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:var(--accent)">${pct}%</span>
+          <button class="btn-small" onclick="openGoalModal(goals.find(x=>x.id===${g.id}))" style="padding:3px 8px;font-size:11px">${t('btn_edit')}</button>
+          <button class="btn-small danger" onclick="deleteGoal(${g.id})" style="padding:3px 8px;font-size:11px">✕</button>
+        </div>
+      </div>
+      <div class="prog-track" style="margin-bottom:9px"><div class="prog-fill" style="width:${pct}%;background:var(--accent)"></div></div>
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;font-size:12px;color:var(--muted)">
+        <span>${t('lbl_saved')} : <strong style="color:var(--text)">${fmtCur(g.saved)}</strong></span>
+        <span>${t('lbl_target')} : <strong style="color:var(--text)">${fmtCur(g.target)}</strong></span>
+        <span>${t('f_monthly_contrib')} : <strong style="color:var(--green)">${contrib>0?fmtCur(contrib)+'/mois':'—'}</strong></span>
+        <span>${t('lbl_left')} : <strong style="color:var(--amber)">${fmtCur(left)}</strong> · ~${moLabel}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 function openGoalModal(g=null){
   document.getElementById('gm-title').textContent=g?t('edit_goal'):t('new_goal');
   document.getElementById('gm-lbl-name').textContent=t('f_goal_name');
   document.getElementById('gm-lbl-target').textContent=t('f_target');
   document.getElementById('gm-lbl-saved').textContent=t('f_already');
+  document.getElementById('gm-lbl-monthly').textContent=t('f_monthly_contrib');
   document.getElementById('gm-btn-cancel').textContent=t('btn_cancel');
   document.getElementById('gm-btn-save').textContent=t('btn_save');
   document.getElementById('gm-edit-id').value=g?g.id:'';
   document.getElementById('gm-name').value=g?g.name:'';
   document.getElementById('gm-target').value=g?g.target:'';
   document.getElementById('gm-saved').value=g?g.saved:'';
+  document.getElementById('gm-monthly-contrib').value=g?(g.monthly||0):'';
   document.getElementById('goal-modal-overlay').classList.add('open');
 }
 function closeGoalModal(){document.getElementById('goal-modal-overlay').classList.remove('open');}
 function saveGoal(){
   const eid=document.getElementById('gm-edit-id').value;
-  const obj={id:eid?+eid:nextId++,name:document.getElementById('gm-name').value||t('new_goal'),target:+document.getElementById('gm-target').value||0,saved:+document.getElementById('gm-saved').value||0};
+  const obj={
+    id:eid?+eid:nextId++,
+    name:document.getElementById('gm-name').value||t('new_goal'),
+    target:+document.getElementById('gm-target').value||0,
+    saved:+document.getElementById('gm-saved').value||0,
+    monthly:+document.getElementById('gm-monthly-contrib').value||0,
+  };
   if(eid){const i=goals.findIndex(x=>x.id===+eid);if(i>=0)goals[i]=obj;}else goals.push(obj);
   closeGoalModal();renderSavings();saveAll();
 }
@@ -1324,41 +1408,125 @@ function updateProj(){
 function setProjYears(n,btn){projYears=n;document.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');updateProj();}
 
 // ══════════════════════════════════════════════
-// LOCALSTORAGE PERSISTENCE
+// PERSISTANCE — Clé stable + migration + export/import
 // ══════════════════════════════════════════════
-const STORAGE_KEY = 'mf_data_v5';
+
+// Clé PERMANENTE — ne jamais changer, même lors des mises à jour
+const STORAGE_KEY = 'finances_pro_nasser';
+// Anciennes clés à migrer automatiquement si présentes
+const LEGACY_KEYS = ['mf_data_v5', 'mf_data_v4', 'mf_data_v3'];
+
 let appReady = false;
+
+function buildPayload() {
+  return {
+    _version: 1,
+    _savedAt: new Date().toISOString(),
+    incomes, expenses, goals, debts, oweds, trackerEntries, nextId,
+    currentCurrency, currentLang, currentPalette, currentMode,
+    userName: document.getElementById('app-greeting')?.textContent || '',
+  };
+}
+
+function applyPayload(d) {
+  // Migration : ajoute les champs manquants si ancienne version
+  if (d.incomes)        incomes        = d.incomes;
+  if (d.expenses)       expenses       = d.expenses;
+  if (d.goals)          goals          = d.goals.map(g => ({ monthly: 0, ...g })); // migration : ajoute monthly si absent
+  if (d.debts)          debts          = d.debts;
+  if (d.oweds)          oweds          = d.oweds;
+  if (d.trackerEntries) trackerEntries = d.trackerEntries;
+  if (d.nextId)         nextId         = d.nextId;
+  if (d.currentCurrency) currentCurrency = d.currentCurrency;
+  if (d.currentLang)    currentLang    = d.currentLang;
+  if (d.currentPalette) currentPalette = d.currentPalette;
+  if (d.currentMode)    currentMode    = d.currentMode;
+  return d.userName || false;
+}
 
 function saveAll() {
   if (!appReady) return;
   try {
-    const payload = {
-      incomes, expenses, goals, debts, oweds, trackerEntries, nextId,
-      currentCurrency, currentLang, currentPalette, currentMode,
-      userName: document.getElementById('app-greeting')?.textContent || '',
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch(e) { console.warn('Save failed', e); }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPayload()));
+  } catch(e) { console.warn('Sauvegarde échouée :', e); }
 }
 
 function loadSaved() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    // 1. Cherche la clé principale
+    let raw = localStorage.getItem(STORAGE_KEY);
+
+    // 2. Migration automatique depuis les anciennes clés
+    if (!raw) {
+      for (const oldKey of LEGACY_KEYS) {
+        raw = localStorage.getItem(oldKey);
+        if (raw) {
+          console.log('Migration depuis', oldKey);
+          localStorage.setItem(STORAGE_KEY, raw); // copie vers la nouvelle clé
+          localStorage.removeItem(oldKey);         // supprime l'ancienne
+          break;
+        }
+      }
+    }
+
     if (!raw) return false;
     const d = JSON.parse(raw);
-    if (d.incomes)       incomes        = d.incomes;
-    if (d.expenses)      expenses       = d.expenses;
-    if (d.goals)         goals          = d.goals;
-    if (d.debts)         debts          = d.debts;
-    if (d.oweds)         oweds          = d.oweds;
-    if (d.trackerEntries) trackerEntries = d.trackerEntries;
-    if (d.nextId)        nextId         = d.nextId;
-    if (d.currentCurrency) currentCurrency = d.currentCurrency;
-    if (d.currentLang)   currentLang    = d.currentLang;
-    if (d.currentPalette) currentPalette = d.currentPalette;
-    if (d.currentMode)   currentMode    = d.currentMode;
-    return d.userName || false;
-  } catch(e) { return false; }
+    return applyPayload(d);
+  } catch(e) {
+    console.warn('Chargement échoué :', e);
+    return false;
+  }
+}
+
+// ── EXPORT ──
+function exportData() {
+  try {
+    const payload = buildPayload();
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toISOString().split('T')[0];
+    a.href = url;
+    a.download = `finances-pro-backup-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('Erreur lors de l\'export : ' + e.message);
+  }
+}
+
+// ── IMPORT ──
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const d = JSON.parse(e.target.result);
+      // Validation minimale
+      if (!d.incomes && !d.expenses) throw new Error('Fichier invalide');
+      const name = applyPayload(d);
+      saveAll();
+      // Recharge l'interface
+      applyTheme(currentPalette, currentMode);
+      if (name) {
+        launchApp(name.replace(/^(Bonjour|Bon après-midi|Bonsoir|Good morning|Good afternoon|Good evening),\s*/i,'').replace(' !','').trim());
+      } else {
+        renderAll();
+      }
+      const msg = currentLang === 'fr' ? '✅ Données importées avec succès !' : '✅ Data imported successfully!';
+      alert(msg);
+    } catch(err) {
+      const msg = currentLang === 'fr'
+        ? '❌ Fichier invalide. Assurez-vous d\'utiliser un fichier exporté depuis cette application.'
+        : '❌ Invalid file. Make sure to use a file exported from this application.';
+      alert(msg);
+    }
+  };
+  reader.readAsText(file);
+  // Reset input pour permettre re-import du même fichier
+  event.target.value = '';
 }
 
 
@@ -1366,6 +1534,7 @@ function resetApp() {
   const btn = document.getElementById('reset-btn');
   if (btn.dataset.pending === '1') {
     localStorage.removeItem(STORAGE_KEY);
+    LEGACY_KEYS.forEach(k => localStorage.removeItem(k));
     location.reload();
   } else {
     btn.dataset.pending = '1';
