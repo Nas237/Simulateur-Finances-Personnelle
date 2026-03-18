@@ -842,7 +842,7 @@ function generateTips(ctx) {
   tips.push({ icon: '🚀', promo: true, text: fr
     ? `<strong>Et si votre argent travaillait vraiment pour vous ?</strong> Rejoins une communauté de personnes qui construisent leur liberté financière et découvrent leur plein potentiel.`
     : `<strong>What if your money truly worked for you?</strong> Join a community of people building financial freedom and unlocking their full potential.`,
-    cta: fr ? 'Contactez-moi pour en savoir plus' : 'Contact me to find out more',
+    cta: fr ? 'Contactez Nasser pour en savoir plus' : 'Contact Nasser to find out more',
     link: 'https://wa.me/237656678249'
   });
 
@@ -1624,6 +1624,11 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.warn('SW échec :', err));
   });
 }
+
+function showFooter() {
+  const f = document.getElementById('app-footer');
+  if (f) f.style.display = 'block';
+}
 </script>
 
 <!-- WATERMARK -->
@@ -1638,10 +1643,5 @@ if ('serviceWorker' in navigator) {
   </a>
   <p style="font-size:10px;color:var(--muted);margin-top:6px;opacity:.6">© 2025 Nasser Mouchili — Tous droits réservés</p>
 </div>
-
-<script>
-// Affiche le footer uniquement quand l'app est ouverte
-function showFooter(){ document.getElementById('app-footer').style.display='block'; }
-</script>
 </body>
 </html>
