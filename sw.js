@@ -1,12 +1,12 @@
 // ─── Service Worker — Simulateur Finances Pro ───
 // Stratégie : Cache-first pour l'app shell, Network-first pour les CDN
 
-const CACHE_NAME = 'finances-pro-v1';
+const CACHE_NAME = 'finances-pro-v2';
 const APP_SHELL = [
   './',
   './index.html',
 ];
-const CDN_CACHE = 'finances-cdn-v1';
+const CDN_CACHE = 'finances-cdn-v2';
 
 // Installation — mise en cache de l'app shell
 self.addEventListener('install', event => {
