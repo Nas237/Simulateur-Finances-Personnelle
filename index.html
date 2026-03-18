@@ -329,8 +329,8 @@ html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:va
   <div class="nav" id="main-nav"></div>
   <div class="section active" id="tab-dashboard"></div>
   <div class="section" id="tab-budget"></div>
-  <div class="section" id="tab-tracker"></div>
   <div class="section" id="tab-savings"></div>
+  <div class="section" id="tab-tracker"></div>
   <div class="section" id="tab-debts"></div>
   <div class="section" id="tab-projection"></div>
 </div>
@@ -484,7 +484,10 @@ const T = {
     greet_sub:'Voici votre tableau de bord financier.',
     sec_dash:'Tableau de bord',sub_dash:'Vue d\'ensemble de votre situation',
     lbl_inc:'Revenus mensuels',lbl_exp:'Dépenses budget',lbl_real:'Dépenses réelles',
-    lbl_sav:'Épargne nette',lbl_debt:'Dettes totales',
+    lbl_sav:'Épargne nette',lbl_surplus:'Surplus brut',lbl_free:'Argent libre',lbl_debt:'Dettes totales',
+    lbl_auto_sav:'Épargne automatique',lbl_auto_sav_sub:'% de vos revenus prélevé en priorité',
+    alert_over_sav_fr:'Vos contributions ({contrib}) dépassent votre épargne auto ({auto}). Réduisez de {diff}.',
+    alert_over_surplus:'Vos contributions ({contrib}) dépassent votre surplus ({surplus}). Réduisez de {diff}.',
     panel_dist:'Répartition des dépenses',panel_bilan:'Bilan mensuel',
     g_housing:'Logement',g_daily:'Vie courante',g_leisure:'Loisirs & abo.',g_savings:'Épargne',
     sec_budget:'Mon Budget',sub_budget:'Revenus et dépenses mensuels prévus',
@@ -548,7 +551,10 @@ const T = {
     greet_sub:'Here is your financial dashboard.',
     sec_dash:'Dashboard',sub_dash:'Overview of your financial situation',
     lbl_inc:'Monthly income',lbl_exp:'Budget expenses',lbl_real:'Actual expenses',
-    lbl_sav:'Net savings',lbl_debt:'Total debts',
+    lbl_sav:'Net savings',lbl_surplus:'Gross surplus',lbl_free:'Free cash',lbl_debt:'Total debts',
+    lbl_auto_sav:'Automatic savings',lbl_auto_sav_sub:'% of income set aside first',
+    alert_over_sav_fr:'Your contributions ({contrib}) exceed your auto savings ({auto}). Reduce by {diff}.',
+    alert_over_surplus:'Your contributions ({contrib}) exceed your surplus ({surplus}). Reduce by {diff}.',
     panel_dist:'Expense breakdown',panel_bilan:'Monthly summary',
     g_housing:'Housing',g_daily:'Daily life',g_leisure:'Leisure & subs',g_savings:'Savings',
     sec_budget:'My Budget',sub_budget:'Planned monthly income and expenses',
@@ -672,6 +678,7 @@ let expenses=[
   {id:7,label:'Habillement',val:80,color:'#fb7185'},
 ];
 const CAT_COLORS=['#5b8cf7','#3ecf8e','#f5a623','#ef5959','#a78bfa','#38bdf8','#fb7185','#f472b6','#34d399','#fbbf24'];
+let autoSavingsPct = 20; // % des revenus épargnés automatiquement
 let goals=[{id:1,name:"Fonds d'urgence",target:10000,saved:6200,monthly:200},{id:2,name:"Voyage Japon",target:3500,saved:1800,monthly:150},{id:3,name:"Apport immobilier",target:40000,saved:14500,monthly:300}];
 let debts=[
   {id:1,kind:'credit',name:'Crédit immobilier',capital:180000,remaining:142000,rate:1.85,monthly:820,date:'2020-04'},
@@ -697,7 +704,10 @@ let trackerYear=new Date().getFullYear(), trackerMonth=new Date().getMonth(), ac
 // ══════════════════════════════════════════════
 const totalIncome=()=>incomes.reduce((s,i)=>s+i.val,0);
 const totalExpenses=()=>expenses.reduce((s,e)=>s+e.val,0);
-const savings=()=>totalIncome()-totalExpenses();
+const savings=()=>totalIncome()-totalExpenses(); // surplus brut
+const totalGoalContribs=()=>goals.reduce((s,g)=>s+(g.monthly||0),0); // épargne nette réelle
+const autoSavingsAmt=()=>Math.round(totalIncome()*autoSavingsPct/100); // montant épargne auto
+const freeCash=()=>totalIncome()-totalExpenses()-autoSavingsAmt(); // argent libre
 const calcTotalDue=()=>debts.reduce((s,d)=>s+d.remaining,0);
 const calcMonthlyDebt=()=>debts.reduce((s,d)=>s+d.monthly,0);
 const calcTotalOwed=()=>oweds.reduce((s,o)=>s+o.amount,0);
@@ -718,7 +728,7 @@ function trackerCurrentMonthTotal(){const now=new Date();return trackerEntries.f
 // NAV
 // ══════════════════════════════════════════════
 function renderNav(){
-  const tabs=[{id:'dashboard',k:'nav_dash'},{id:'budget',k:'nav_budget'},{id:'tracker',k:'nav_tracker'},{id:'savings',k:'nav_savings'},{id:'debts',k:'nav_debts'},{id:'projection',k:'nav_proj'}];
+  const tabs=[{id:'dashboard',k:'nav_dash'},{id:'budget',k:'nav_budget'},{id:'savings',k:'nav_savings'},{id:'tracker',k:'nav_tracker'},{id:'debts',k:'nav_debts'},{id:'projection',k:'nav_proj'}];
   document.getElementById('main-nav').innerHTML=tabs.map(tab=>`<button class="nav-btn${document.getElementById('tab-'+tab.id).classList.contains('active')?' active':''}" onclick="showTab('${tab.id}',this)">${t(tab.k)}</button>`).join('');
 }
 function showTab(id,btn){
@@ -912,17 +922,40 @@ function loadDiagnosis() {
 // ══════════════════════════════════════════════
 let donut=null;
 function renderDashboard(){
-  const inc=totalIncome(),exp=totalExpenses(),sav=savings(),rate=inc>0?Math.round(sav/inc*100):0;
+  const inc=totalIncome(),exp=totalExpenses();
+  const surplusBrut=savings();
+  const epargneNette=totalGoalContribs();
+  const argentLibre=freeCash();
+  const autoAmt=autoSavingsAmt();
+  const contribExceedsAuto=epargneNette>autoAmt && autoAmt>0;
+  const contribExceedsSurplus=epargneNette>surplusBrut;
   const el=document.getElementById('tab-dashboard');
+
+  const alertBanner = contribExceedsSurplus
+    ? `<div style="background:rgba(239,89,89,.1);border:1px solid rgba(239,89,89,.3);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--red)">
+        ⚠️ <strong>${currentLang==='fr'?'Dépassement':'Overspending'}</strong> — ${currentLang==='fr'
+          ?`Vos contributions d'épargne (${fmtCur(epargneNette)}) dépassent votre surplus brut (${fmtCur(surplusBrut)}). Réduisez de <strong>${fmtCur(epargneNette-surplusBrut)}</strong>.`
+          :`Your savings contributions (${fmtCur(epargneNette)}) exceed your gross surplus (${fmtCur(surplusBrut)}). Reduce by <strong>${fmtCur(epargneNette-surplusBrut)}</strong>.`}
+       </div>`
+    : contribExceedsAuto
+    ? `<div style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--amber)">
+        ⚠️ <strong>${currentLang==='fr'?'Attention':'Warning'}</strong> — ${currentLang==='fr'
+          ?`Vos contributions (${fmtCur(epargneNette)}) dépassent votre épargne automatique (${fmtCur(autoAmt)}). Réduisez de <strong>${fmtCur(epargneNette-autoAmt)}</strong> ou augmentez votre % automatique.`
+          :`Your contributions (${fmtCur(epargneNette)}) exceed your auto savings (${fmtCur(autoAmt)}). Reduce by <strong>${fmtCur(epargneNette-autoAmt)}</strong> or increase your auto % .`}
+       </div>`
+    : '';
+
   el.innerHTML=`
     <div class="sec-head">${t('sec_dash')}</div>
     <div class="sec-sub">${t('sub_dash')}</div>
+    ${alertBanner}
     <div class="cards">
       <div class="card"><div class="card-label">${t('lbl_inc')}</div><div class="card-val accent">${fmtCur(inc)}</div></div>
       <div class="card"><div class="card-label">${t('lbl_exp')}</div><div class="card-val red">${fmtCur(exp)}</div></div>
+      <div class="card"><div class="card-label">${t('lbl_surplus')}</div><div class="card-val ${surplusBrut>=0?'accent':'red'}">${fmtCur(surplusBrut)}</div><div class="card-sub">${currentLang==='fr'?'Revenus − Dépenses':'Income − Expenses'}</div></div>
+      <div class="card"><div class="card-label">${t('lbl_sav')}</div><div class="card-val ${contribExceedsSurplus?'red':contribExceedsAuto?'amber':'green'}">${fmtCur(epargneNette)}</div><div class="card-sub">${currentLang==='fr'?'Somme des contributions':'Sum of contributions'}</div></div>
+      <div class="card"><div class="card-label">${t('lbl_free')}</div><div class="card-val ${argentLibre>=0?'green':'red'}">${fmtCur(argentLibre)}</div><div class="card-sub">${currentLang==='fr'?'Après épargne auto':'After auto savings'}</div></div>
       <div class="card"><div class="card-label">${t('lbl_real')}</div><div class="card-val red">${fmtCur(trackerCurrentMonthTotal())}</div><div class="card-sub">${t('months')[new Date().getMonth()]}</div></div>
-      <div class="card"><div class="card-label">${t('lbl_sav')}</div><div class="card-val ${sav>=0?'green':'red'}">${fmtCur(sav)}</div><div class="card-sub">${rate}%</div></div>
-      <div class="card"><div class="card-label">${t('lbl_debt')}</div><div class="card-val red">${fmtK(calcTotalDue())}</div></div>
     </div>
     <div class="grid2">
       <div class="panel">
@@ -946,14 +979,13 @@ function renderDashboard(){
       <div id="diag-content"></div>
     </div>`;
 
-  // Meter
-  const savPct=Math.max(0,inc>0?sav/inc*100:0);
+  const savPct=Math.max(0,inc>0?autoAmt/inc*100:0);
   document.getElementById('bgtMeter').innerHTML=expenses.map(e=>`<div class="bgt-seg" style="width:${inc>0?e.val/inc*100:0}%;background:${e.color}"></div>`).join('')+`<div class="bgt-seg" style="width:${savPct}%;background:rgba(62,207,142,.3)"></div>`;
   const groups=[
     {label:t('g_housing'),val:expenses[0]?.val||0,color:'#5b8cf7'},
     {label:t('g_daily'),val:(expenses[1]?.val||0)+(expenses[6]?.val||0),color:'#3ecf8e'},
     {label:t('g_leisure'),val:(expenses[3]?.val||0)+(expenses[4]?.val||0),color:'#a78bfa'},
-    {label:t('g_savings'),val:Math.max(0,sav),color:'#f5a623'},
+    {label:t('g_savings'),val:epargneNette,color:'#f5a623'},
   ];
   document.getElementById('bilRows').innerHTML=groups.map(g=>{const pct=inc>0?Math.round(g.val/inc*100):0;return `<div class="prog-row"><div class="prog-head"><span>${g.label}</span><span>${fmtCur(g.val)} <span style="color:var(--muted)">${pct}%</span></span></div><div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${g.color}"></div></div></div>`;}).join('');
   if(donut)donut.destroy();
@@ -1137,8 +1169,58 @@ function deleteEntry(id){trackerEntries=trackerEntries.filter(e=>e.id!==id);upda
 // SAVINGS
 // ══════════════════════════════════════════════
 function renderSavings(){
+  const inc=totalIncome();
+  const autoAmt=autoSavingsAmt();
+  const epargneNette=totalGoalContribs();
+  const surplusBrut=savings();
+  const contribExceedsAuto=epargneNette>autoAmt && autoAmt>0;
+  const contribExceedsSurplus=epargneNette>surplusBrut;
+
+  const alertHtml = contribExceedsSurplus
+    ? `<div style="background:rgba(239,89,89,.1);border:1px solid rgba(239,89,89,.3);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--red)">
+        ⚠️ <strong>${currentLang==='fr'?'Dépassement du surplus':'Surplus exceeded'}</strong> —
+        ${currentLang==='fr'
+          ?'Vos contributions ('+fmtCur(epargneNette)+') dépassent votre surplus brut ('+fmtCur(surplusBrut)+'). Réduisez de <strong>'+fmtCur(epargneNette-surplusBrut)+'</strong>.'
+          :'Your contributions ('+fmtCur(epargneNette)+') exceed your gross surplus ('+fmtCur(surplusBrut)+'). Reduce by <strong>'+fmtCur(epargneNette-surplusBrut)+'</strong>.'}
+       </div>`
+    : contribExceedsAuto
+    ? `<div style="background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:var(--amber)">
+        ⚠️ <strong>${currentLang==='fr'?'Contributions trop élevées':'Contributions too high'}</strong> —
+        ${currentLang==='fr'
+          ?'Vos contributions ('+fmtCur(epargneNette)+') dépassent votre épargne automatique ('+fmtCur(autoAmt)+'). Réduisez de <strong>'+fmtCur(epargneNette-autoAmt)+'</strong> ou augmentez votre % automatique.'
+          :'Your contributions ('+fmtCur(epargneNette)+') exceed your auto savings ('+fmtCur(autoAmt)+'). Reduce by <strong>'+fmtCur(epargneNette-autoAmt)+'</strong> or increase your auto %.'}
+       </div>`
+    : '';
+
   const el=document.getElementById('tab-savings');
-  el.innerHTML=`<div class="sec-head">${t('sec_savings')}</div><div class="sec-sub">${t('sub_savings')}</div><button class="btn-add" onclick="openGoalModal()">${t('btn_new_goal')}</button><div id="goals-list"></div>`;
+  el.innerHTML=`
+    <div class="sec-head">${t('sec_savings')}</div>
+    <div class="sec-sub">${t('sub_savings')}</div>
+
+    <div class="panel" style="margin-bottom:18px">
+      <div class="panel-title">${t('lbl_auto_sav')}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${t('lbl_auto_sav_sub')}</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <input type="range" id="auto-pct-slider" min="0" max="50" step="1" value="${autoSavingsPct}"
+          oninput="autoSavingsPct=+this.value;document.getElementById('auto-pct-num').value=this.value;document.getElementById('auto-pct-display').textContent=this.value+'%';document.getElementById('auto-amt-display').textContent='= '+fmtCur(totalIncome()*this.value/100)+'/mois';saveAll();renderDashboard();"
+          style="flex:1;accent-color:var(--accent)">
+        <input type="number" id="auto-pct-num" min="0" max="50" step="1" value="${autoSavingsPct}"
+          oninput="let v=Math.max(0,Math.min(50,+this.value||0));autoSavingsPct=v;document.getElementById('auto-pct-slider').value=v;document.getElementById('auto-pct-display').textContent=v+'%';document.getElementById('auto-amt-display').textContent='= '+fmtCur(totalIncome()*v/100)+'/mois';saveAll();renderDashboard();"
+          style="width:65px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-family:var(--font-body);font-size:14px;font-weight:500;padding:6px 8px;border-radius:var(--radius-sm);outline:none;text-align:right">
+        <span id="auto-pct-display" style="font-size:22px;font-weight:300;font-family:var(--font-head);color:var(--green);min-width:52px">${autoSavingsPct}%</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">
+        <span id="auto-amt-display" style="color:var(--green);font-weight:500">= ${fmtCur(autoAmt)}/mois</span>
+        <span style="color:var(--muted)">${currentLang==='fr'?'Total contributions':'Total contributions'} :
+          <strong style="color:${contribExceedsSurplus?'var(--red)':contribExceedsAuto?'var(--amber)':'var(--text)'}">${fmtCur(epargneNette)}</strong>
+        </span>
+      </div>
+    </div>
+
+    ${alertHtml}
+    <button class="btn-add" onclick="openGoalModal()">${t('btn_new_goal')}</button>
+    <div id="goals-list"></div>`;
+
   const gl=document.getElementById('goals-list');
   if(!goals.length){gl.innerHTML=`<div class="empty-state"><div>🎯</div>${t('no_goal')}</div>`;return;}
   gl.innerHTML=goals.map(g=>{
@@ -1146,7 +1228,7 @@ function renderSavings(){
     const left=Math.max(0,g.target-g.saved);
     const contrib=g.monthly||0;
     const mo=contrib>0?Math.ceil(left/contrib):'∞';
-    const moLabel=contrib>0?(mo+' '+t('lbl_months')):'— '+( currentLang==='fr'?'(définissez une contribution)':'(set a contribution)');
+    const moLabel=contrib>0?(mo+' '+t('lbl_months')):'— '+(currentLang==='fr'?'(définissez une contribution)':'(set a contribution)');
     return `<div class="goal-item">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
         <span style="font-size:14px;font-weight:500">${g.name}</span>
@@ -1423,6 +1505,7 @@ function buildPayload() {
     _version: 1,
     _savedAt: new Date().toISOString(),
     incomes, expenses, goals, debts, oweds, trackerEntries, nextId,
+    autoSavingsPct,
     currentCurrency, currentLang, currentPalette, currentMode,
     userName: document.getElementById('app-greeting')?.textContent || '',
   };
@@ -1437,6 +1520,7 @@ function applyPayload(d) {
   if (d.oweds)          oweds          = d.oweds;
   if (d.trackerEntries) trackerEntries = d.trackerEntries;
   if (d.nextId)         nextId         = d.nextId;
+  if (typeof d.autoSavingsPct === 'number') autoSavingsPct = d.autoSavingsPct;
   if (d.currentCurrency) currentCurrency = d.currentCurrency;
   if (d.currentLang)    currentLang    = d.currentLang;
   if (d.currentPalette) currentPalette = d.currentPalette;
